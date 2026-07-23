@@ -42,7 +42,7 @@ The course's six graded highlights are mapped to explicit, checkable requirement
 
 ## 3. Step-by-Step Requirements
 
-### Phase 0 — Environment & Reproducibility (prerequisite)
+### Phase 0 — Environment & Reproducibility (prerequisite) - DONE
 1. Set a global random seed (e.g., `42`) and pass it explicitly to every stochastic routine (t-SNE, UMAP, k-means, train/test splits).
 2. Pin package versions in a `requirements.txt` (minimum: `numpy`, `pandas`, `scikit-learn`, `scipy`, `matplotlib`, `seaborn`, `umap-learn`).
 3. Download the dataset programmatically or document the manual download step; **do not** commit the raw ~70 MB tar/CSV data to GitHub — add it to `.gitignore` and provide a `download_data.py` / documented Kaggle CLI command instead.
