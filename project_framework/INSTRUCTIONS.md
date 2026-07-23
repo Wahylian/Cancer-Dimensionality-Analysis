@@ -47,7 +47,7 @@ The course's six graded highlights are mapped to explicit, checkable requirement
 2. Pin package versions in a `requirements.txt` (minimum: `numpy`, `pandas`, `scikit-learn`, `scipy`, `matplotlib`, `seaborn`, `umap-learn`).
 3. Download the dataset programmatically or document the manual download step; **do not** commit the raw ~70 MB tar/CSV data to GitHub — add it to `.gitignore` and provide a `download_data.py` / documented Kaggle CLI command instead.
 
-### Phase 1 — Preprocessing & Cleaning
+### Phase 1 — Preprocessing & Cleaning - IN REVIEW
 1. Load the expression matrix `X` (801 × 20,531) and label vector `y` (5 classes); assert shapes and check for and report any missing values (expected: none) and any zero-variance genes (report the count; you must decide whether to drop them and justify it).
 2. Apply a `log2(1 + x)` (or `log1p`) transform to the raw expression counts and justify this choice with reference to the right-skewed nature of RNA-Seq count data.
 3. Standardize features (zero mean, unit variance) **after** the log transform, and explicitly justify why standardization matters for PCA/covariance-based methods but must be applied consistently before distance-based methods (t-SNE/UMAP/k-NN) too.
