@@ -1,9 +1,10 @@
 """Top-level orchestration script.
 
-Currently implements Phase 1 (preprocessing & cleaning) only. Later phases
-will be added here as their `src/` modules are implemented, per
-project_framework/SKELETON.md. Contains no analysis logic of its own --
-only orchestration, logging, and figure/table export.
+Implements Phase 1 (preprocessing & cleaning) and Phase 2 (intrinsic
+dimension estimation). Later phases will be added here as their `src/`
+modules are implemented, per project_framework/SKELETON.md. Contains no
+analysis logic of its own -- only orchestration, logging, and figure/table
+export.
 """
 
 import json
@@ -11,7 +12,17 @@ from pathlib import Path
 
 import numpy as np
 
-from src import config, data_loading, preprocessing, viz
+from src import config, data_loading, evaluation, intrinsic_dimension, preprocessing, synthetic, viz
+
+
+def _estimate_all(X: np.ndarray, seed: int) -> dict:
+    """Run the correlation, PCA, and k-NN MLE estimators on one dataset."""
+    radii = intrinsic_dimension.default_radii(X, seed)
+    return {
+        "correlation": intrinsic_dimension.estimate_correlation_dimension(X, radii),
+        "pca": intrinsic_dimension.pca_based_dimension(X, config.PCA_VARIANCE_THRESHOLDS),
+        "knn": intrinsic_dimension.knn_mle_dimension(X, config.KNN_MLE_K_VALUES),
+    }
 
 
 def main():
@@ -71,6 +82,51 @@ def main():
     print(
         f"Phase 1 complete. Kept {int(keep_mask.sum())}/{len(keep_mask)} genes "
         f"after dropping {int((~keep_mask).sum())} zero-variance genes."
+    )
+
+    # --- Phase 2: synthetic baselines, matched in shape to the real full matrix ---
+    n_samples, n_features = X_scaled_full.shape
+    noise_baseline = synthetic.generate_gaussian_noise_baseline(n_samples, n_features, config.RANDOM_SEED)
+    manifold_baseline = synthetic.generate_low_dim_manifold_baseline(
+        n_samples, n_features, config.MANIFOLD_INTRINSIC_DIM, config.MANIFOLD_NOISE_STD, config.RANDOM_SEED
+    )
+
+    # --- Phase 2: run all three estimators on real data and both baselines ---
+    real_results = _estimate_all(X_scaled_full, config.RANDOM_SEED)
+    synthetic_results = {
+        "Gaussian Noise": _estimate_all(noise_baseline, config.RANDOM_SEED),
+        "Linear Manifold": _estimate_all(manifold_baseline, config.RANDOM_SEED),
+    }
+
+    # --- Phase 2: figures ---
+    viz.scree_plot(
+        real_results["pca"]["eigenvalues"],
+        str(Path(config.FIGURES_DIR) / "scree_plot.png"),
+        elbow_kaiser=real_results["pca"]["elbow_kaiser"],
+        elbow_curvature=real_results["pca"]["elbow_curvature"],
+    )
+    viz.log_log_correlation_plot(
+        real_results["correlation"]["radii"],
+        real_results["correlation"]["C_r"],
+        real_results["correlation"]["scaling_region"],
+        str(Path(config.FIGURES_DIR) / "log_log_correlation.png"),
+    )
+
+    # --- Phase 2: summary table and written reconciliation ---
+    summary_table = evaluation.build_intrinsic_dimension_summary_table(real_results, synthetic_results)
+    reconciliation = evaluation.reconcile_estimators(summary_table)
+
+    summary_table.to_csv(Path(config.FIGURES_DIR) / "phase2_summary_table.csv")
+    with open(Path(config.PROCESSED_DIR) / "phase2_reconciliation.txt", "w") as f:
+        f.write(reconciliation)
+
+    print("\nPhase 2 intrinsic dimension summary:")
+    print(summary_table.to_string())
+    print("\nReconciliation:\n" + reconciliation)
+    print(
+        f"\nPhase 2 complete. Real data: D2={real_results['correlation']['D2']:.2f}, "
+        f"PCA@90%={real_results['pca']['n_components_at_threshold'][0.90]}, "
+        f"kNN-MLE mean={real_results['knn']['mean_across_k']:.2f}."
     )
 
 

@@ -86,3 +86,100 @@ Phase 1.
 - Verified end-to-end by running `run_pipeline.py` against the real
   downloaded dataset and inspecting the printed validation summary and all
   three generated figures before accepting the output.
+
+## Phase 2 — Intrinsic Dimension Estimation
+
+**Files/functions generated with AI assistance:**
+- `src/synthetic.py` — `generate_gaussian_noise_baseline()`,
+  `generate_low_dim_manifold_baseline()`
+- `src/intrinsic_dimension.py` — `correlation_integral()`, `default_radii()`,
+  `_auto_detect_scaling_region()`, `estimate_correlation_dimension()`,
+  `_kaiser_elbow()`, `_curvature_elbow()`, `pca_based_dimension()`,
+  `knn_mle_dimension()`
+- `src/evaluation.py` — `build_intrinsic_dimension_summary_table()`,
+  `reconcile_estimators()`
+- `src/viz.py` — `scree_plot()`, `log_log_correlation_plot()` (the two
+  remaining Phase 2 stubs; `scatter_embedding()` and
+  `spectral_overlay_plot()` are left as Phase 3 `NotImplementedError` stubs)
+- `run_pipeline.py` — Phase 2 orchestration (`_estimate_all()` helper plus
+  synthetic-baseline generation, figure export, summary table/reconciliation
+  export)
+- `src/config.py` — added `CORR_DIM_*`, `PCA_VARIANCE_THRESHOLDS`,
+  `KNN_MLE_*`, `SYNTHETIC_NOISE_STD`, `MANIFOLD_INTRINSIC_DIM`,
+  `MANIFOLD_NOISE_STD`
+- `reports/phase_2.tex` — full Phase 2 methodology/results report
+
+**Representative prompts (paraphrased from the driving instruction set):**
+1. "Implement the Grassberger-Procaccia correlation integral natively via
+   `scipy.spatial.distance.pdist`, computing exact distances once and
+   vectorizing across a log-spaced radii array; auto-detect the linear
+   scaling region via the plateau in the local log-log slope and justify
+   the choice in the report."
+2. "Implement the PCA-based estimator via the full eigenvalue spectrum,
+   avoiding ever forming the (20531 x 20531) covariance matrix; report
+   components needed for 90/95/99% variance and two elbow criteria (Kaiser,
+   second-derivative curvature)."
+3. "Implement the Levina-Bickel k-NN MLE estimator exactly per the given
+   formula with a (k-2) divisor, swept over k=[5,10,20], with an epsilon
+   guard against ln(1)=0 from distance ties under high-dimensional
+   concentration."
+4. "Implement synthetic baseline generators: isotropic Gaussian noise and a
+   known-dimension linear subspace embedded in ambient space with additive
+   noise, matched in shape to the real preprocessed data; run all three
+   estimators on both baselines side by side with the real data in one
+   summary table (`evaluation.py`)."
+5. "Run the full pipeline, verify `figures/scree_plot.png` and
+   `figures/log_log_correlation.png` are produced, and debug any shape or
+   numerical-stability issues before reporting results."
+6. "Author `reports/phase_2.tex` to the same standard as Phase 1, with a
+   dedicated methodological-justification paragraph for every hyperparameter
+   choice and a written reconciliation of the three estimators' disagreement
+   on the real data."
+
+**What was changed, corrected, or rejected from the AI-drafted output, and why:**
+- *The manifold baseline's noise standard deviation was corrected after an
+  empirical sensitivity check, not assumed.* An initial draft used
+  `MANIFOLD_NOISE_STD = 0.1`, chosen only because it "looked small." Running
+  the pipeline showed this made the linear-manifold baseline
+  indistinguishable from pure Gaussian noise across all three estimators
+  (e.g. PCA@90% = 686 vs. 688 for noise, k-NN MLE mean ~522-619 for both).
+  Diagnosis: with an orthonormal embedding basis, isotropic ambient noise of
+  variance $\sigma^2$ adds $d\sigma^2$ of *aggregate* variance across all
+  20,264 coordinates, which swamps the ~5 units of true signal variance for
+  any $\sigma$ that isn't tiny relative to $d$, not just relative to the
+  signal's own scale. A manual sweep (`0.1 -> 0.01 -> 0.001`) was run and
+  recorded in the report (Table "Manifold-baseline sensitivity") before
+  settling on `MANIFOLD_NOISE_STD = 0.001`, at which all three estimators
+  recover the true dimension of 5 closely. This is flagged explicitly in
+  `reports/phase_2.tex` as a finding in its own right, not hidden as a
+  silent parameter tweak.
+- *`intrinsic_dimension.py` exceeds the project's soft ~200-line-per-file
+  guideline (222 lines) after adding `default_radii()`.* This was a
+  deliberate rejection of splitting the file: `SKELETON.md` explicitly
+  designs this module to hold all three estimators (correlation, PCA,
+  k-NN) as one cohesive Phase-2 unit, and `default_radii()` is intrinsically
+  part of the correlation-dimension methodology (radius range selection),
+  not a separate concern. Splitting it out would have fragmented one
+  estimator's logic across files for a ~10% line-count overshoot.
+- *Radius quantiles for the correlation integral are estimated from a
+  300-point random subsample, not the full 801-point pairwise-distance
+  vector.* An initial draft computed the full `pdist` twice per dataset
+  (once for quantile estimation, once inside `correlation_integral`),
+  roughly doubling a ~29s-per-dataset cost for no accuracy benefit, since
+  only approximate quantile bounds are needed to pick a radius range. This
+  was reduced to a cheap subsample specifically to keep the full
+  three-dataset x three-estimator pipeline under ~2 minutes.
+- *Levina-Bickel used the `(k-2)` divisor exactly as specified*, not the
+  more commonly cited `(k-1)` normalization seen in some derivations of
+  the estimator, per the explicit worked formula in the driving
+  instructions; `assert k >= 3` was added since the sweep values
+  (5, 10, 20) all satisfy this but the function would otherwise divide by
+  zero or a negative number for smaller k.
+- Verified end-to-end by running `run_pipeline.py` against the real
+  preprocessed data, inspecting the printed Phase 2 summary table and
+  reconciliation text, visually reviewing both generated figures
+  (`scree_plot.png`, `log_log_correlation.png`), and independently
+  sanity-checking the correlation-dimension implementation against a pure
+  5-D Gaussian control (no ambient embedding) to confirm the estimator
+  itself was correct before attributing the manifold-baseline anomaly to
+  the noise-level parameter rather than a bug.

@@ -47,14 +47,14 @@ The course's six graded highlights are mapped to explicit, checkable requirement
 2. Pin package versions in a `requirements.txt` (minimum: `numpy`, `pandas`, `scikit-learn`, `scipy`, `matplotlib`, `seaborn`, `umap-learn`).
 3. Download the dataset programmatically or document the manual download step; **do not** commit the raw ~70 MB tar/CSV data to GitHub — add it to `.gitignore` and provide a `download_data.py` / documented Kaggle CLI command instead.
 
-### Phase 1 — Preprocessing & Cleaning - IN REVIEW
+### Phase 1 — Preprocessing & Cleaning - DONE
 1. Load the expression matrix `X` (801 × 20,531) and label vector `y` (5 classes); assert shapes and check for and report any missing values (expected: none) and any zero-variance genes (report the count; you must decide whether to drop them and justify it).
 2. Apply a `log2(1 + x)` (or `log1p`) transform to the raw expression counts and justify this choice with reference to the right-skewed nature of RNA-Seq count data.
 3. Standardize features (zero mean, unit variance) **after** the log transform, and explicitly justify why standardization matters for PCA/covariance-based methods but must be applied consistently before distance-based methods (t-SNE/UMAP/k-NN) too.
 4. Report basic exploratory statistics: class balance table, per-gene mean/variance distribution (histogram), and a justification of any variance-based feature filtering you choose to apply (e.g., keeping the top-k most variable genes for computational tractability in specific sub-analyses) — you must show results **both** with the full 20,531-feature matrix (where computationally feasible) and any reduced-feature variant, never only the reduced one.
 5. **Justify in report:** log-transform choice, standardization order, any feature filtering threshold.
 
-### Phase 2 — Intrinsic Dimension Estimation (core requirement)
+### Phase 2 — Intrinsic Dimension Estimation (core requirement) - DONE
 1. **Correlation dimension:** Implement the Grassberger–Procaccia correlation integral C(r) = (2 / (N(N-1))) · #{pairs with distance < r}. Compute it across a logarithmically spaced range of radii, plot log C(r) vs. log r, and estimate the slope (= correlation dimension D₂) via linear regression over the scaling region you identify and justify.
 2. **PCA-based estimator:** Compute the full eigenvalue spectrum of the (regularized) covariance matrix; report the number of components needed to explain 90%, 95%, and 99% of variance, and produce a scree plot with an explicit "elbow" identification method (e.g., Kaiser criterion or explained-variance second-derivative).
 3. **k-NN–based estimator:** Implement at least one neighborhood-based intrinsic dimension estimator (e.g., Levina–Bickel maximum-likelihood estimator) using `k` values from a small sweep (e.g., k = 5, 10, 20) and report sensitivity to k.
