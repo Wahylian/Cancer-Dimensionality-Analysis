@@ -34,3 +34,39 @@ SYNTHETIC_NOISE_STD = 1.0           # isotropic Gaussian baseline, matched to st
 MANIFOLD_INTRINSIC_DIM = 5          # known ground-truth subspace dimension for calibration
 MANIFOLD_NOISE_STD = 0.001          # additive noise std; see reports/phase_2.tex for the noise-level
                                      # sensitivity analysis that motivates this choice
+
+# --- Phase 3: Dimensionality Reduction, Visualization & High-Dimensional Geometry ---
+
+# PCA visualization: number of components to retain for the 2D/3D scatter plots.
+PCA_VIZ_N_COMPONENTS = 3
+
+# t-SNE / UMAP: both are preprocessed with a linear PCA to this many dimensions
+# first (standard practice: denoises and speeds up the nonlinear neighbor search
+# without materially changing the recovered structure, since Phase 2 showed
+# >90% of variance is linear-PCA-recoverable well below this many components).
+EMBEDDING_PCA_PREPROCESS_DIM = 50
+TSNE_PERPLEXITIES = [30, 50]
+UMAP_N_NEIGHBORS_VALUES = [15, 50]
+
+# Johnson-Lindenstrauss random projection: target distortion epsilon. 0.2 is
+# chosen over the more conservative textbook default of 0.1 because, at
+# n=801, the Dasgupta-Gupta bound k >= 4 ln(n) / (eps^2/2 - eps^3/3) scales
+# as 1/eps^2 and eps=0.1 yields a target dimension (~5732) that barely
+# compresses the d=20,264 ambient space, obscuring the demonstration; 0.2
+# yields a still-tight, standard distortion tolerance with a much more
+# illustrative ~13x reduction.
+JL_EPSILON = 0.2
+
+# Spectral analysis (Marchenko-Pastur): reuse the top-k variable gene subset
+# for tractability (same subset already cached in data/processed/phase1_topk.npz).
+SPECTRAL_N_TOP_GENES = N_TOP_VARIABLE_GENES
+
+# Distance concentration diagnostic: feature-subsample sizes; the full gene
+# count is appended at runtime from the actual (post zero-variance-filter) shape.
+GEOMETRY_FEATURE_COUNTS = [10, 100, 1000]
+GEOMETRY_CONCENTRATION_EPSILON = 0.1   # relative deviation threshold for the theoretical bound
+
+# Mahalanobis anomaly detection: Ledoit-Wolf shrinkage on the top-k gene subset
+# (the full 20,264-d covariance matrix is ~3.3 GB and never formed, matching the
+# Phase 2 PCA estimator's approach to the same d >> n singularity problem).
+MAHALANOBIS_ALPHA = 0.025           # upper-tail chi-squared quantile (97.5%) for the outlier threshold

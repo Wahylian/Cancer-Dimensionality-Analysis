@@ -183,3 +183,130 @@ Phase 1.
   5-D Gaussian control (no ambient embedding) to confirm the estimator
   itself was correct before attributing the manifold-baseline anomaly to
   the noise-level parameter rather than a bug.
+
+## Phase 3 — Dimensionality Reduction, Visualization & High-Dimensional Geometry
+
+**Files/functions generated with AI assistance:**
+- `src/embeddings.py` — `run_pca()`, `_pca_preprocess()`, `run_tsne()`, `run_umap()`
+- `src/random_projection.py` — `jl_target_dimension()`,
+  `random_gaussian_projection()`, `evaluate_distance_preservation()`
+- `src/spectral_analysis.py` — `empirical_spectral_distribution()`,
+  `marchenko_pastur_density()`, `marchenko_pastur_support()`,
+  `identify_spectral_outliers()`
+- `src/geometry_diagnostics.py` — `pairwise_distance_concentration()`,
+  `theoretical_concentration_bound()`
+- `src/anomaly_detection.py` — `shrinkage_covariance()`,
+  `chi_squared_threshold()`, `mahalanobis_outliers()`
+- `src/viz.py` — `scatter_embedding()`, `embedding_hyperparam_comparison_plot()`,
+  `spectral_overlay_plot()` (rewritten from a single-panel stub, see below),
+  `jl_distortion_plot()`, `distance_concentration_plot()`,
+  `mahalanobis_distribution_plot()`
+- `run_pipeline.py` — Phase 3 orchestration (PCA/t-SNE/UMAP visualization,
+  JL projection experiment, spectral analysis, distance concentration,
+  Mahalanobis anomaly detection; figure and summary-artifact export)
+- `src/config.py` — added `PCA_VIZ_N_COMPONENTS`, `EMBEDDING_PCA_PREPROCESS_DIM`,
+  `TSNE_PERPLEXITIES`, `UMAP_N_NEIGHBORS_VALUES`, `JL_EPSILON`,
+  `SPECTRAL_N_TOP_GENES`, `GEOMETRY_FEATURE_COUNTS`,
+  `GEOMETRY_CONCENTRATION_EPSILON`, `MAHALANOBIS_ALPHA`
+- `reports/phase_3.tex` — full Phase 3 methodology/results report
+
+**Representative prompts (paraphrased from the driving instruction set):**
+1. "Implement `src/embeddings.py`: PCA via exact SVD for 2D/3D visualization,
+   and t-SNE/UMAP wrappers, each swept over at least two hyperparameter
+   values, all seeded from `config.RANDOM_SEED`."
+2. "Implement the Johnson-Lindenstrauss target-dimension formula and a
+   random Gaussian projection, then empirically evaluate pairwise-distance
+   distortion against the theoretical `(1 +/- epsilon)` bound."
+3. "Implement the empirical spectral distribution of a tractable gene
+   subset's correlation matrix and the theoretical Marchenko-Pastur density
+   for overlay comparison, including the point-mass-at-zero case for
+   aspect ratio > 1, and flag eigenvalues beyond the theoretical support
+   edge as outliers."
+4. "Implement pairwise distance concentration across feature-subsample
+   sizes and a theoretical Hoeffding- or Chernoff-type bound for
+   comparison, justified explicitly since Hoeffding itself requires
+   bounded variables that standardized RNA-Seq features do not satisfy."
+5. "Implement Ledoit-Wolf shrinkage covariance and chi-squared-thresholded
+   Mahalanobis outlier detection; the raw sample covariance must never be
+   used directly given d >> n."
+6. "Run the full pipeline, inspect every generated Phase 3 figure visually
+   before writing the report, and cite only the real printed/computed
+   numbers -- no fabricated metrics."
+7. "Author `reports/phase_3.tex` to the same standard as Phases 1-2, with a
+   dedicated methodological-justification paragraph for every hyperparameter
+   choice (t-SNE/UMAP settings, JL epsilon, spectral feature-subset size,
+   Mahalanobis threshold) and a discussion section reconciling Phase 3
+   findings with Phase 2's intrinsic-dimension estimates."
+
+**What was changed, corrected, or rejected from the AI-drafted output, and why:**
+- *`JL_EPSILON` was corrected from an initial draft value of `0.1` to
+  `0.2`, based on computing the actual target dimension before committing
+  to a default.* At `n=801`, the Dasgupta-Gupta bound
+  `k >= 4 ln(n) / (eps^2/2 - eps^3/3)` scales as `1/eps^2`; `eps=0.1`
+  yields `k=5,732`, which barely compresses `d=20,264` (a `3.5x` reduction)
+  and would make a weak demonstration figure. `eps=0.2` yields `k=1,543`
+  (`13.1x` reduction) while remaining a standard, defensible distortion
+  tolerance. This is documented directly in `config.py` as a comment, not
+  hidden as an arbitrary constant.
+- *`viz.spectral_overlay_plot()` was rewritten from single-panel to
+  two-panel after visually reviewing the first pipeline run's output.* The
+  initial single-panel version plotted all nonzero eigenvalues on one
+  linear x-axis; because 27 outlier eigenvalues (up to 318.3) coexist with
+  a Marchenko-Pastur bulk edge at 6.66, the single-axis histogram forced an
+  x-range of ~330, compressing the entire bulk-vs-theory comparison into an
+  unreadable sliver near the origin. This was corrected to a two-panel
+  design: a zoomed bulk-only panel (eigenvalues within the theoretical
+  support) overlaid with the (renormalized-conditional) Marchenko-Pastur
+  density, and a full-range log-count panel showing the outlier tail
+  against a marked support edge. The run_pipeline.py call site and the
+  eigenvalue filtering (`bulk_eigs` computed strictly within
+  `[0, support_upper]`, excluding both the zero point-mass and the 27
+  outliers) were updated to match.
+- *Anomaly detection and spectral analysis both operate on the cached
+  top-2,000-gene subset, not the full 20,264-gene matrix.* This mirrors
+  Phase 2's own justification for never forming the full covariance matrix
+  (~3.3 GB, and here additionally requiring an inversion for Mahalanobis
+  distance, which is not tractable as a per-sample diagnostic at that
+  size); documented explicitly in both modules' docstrings rather than
+  left implicit.
+- *The distance-concentration theoretical bound was deliberately not
+  implemented as a literal Hoeffding bound*, despite `SKELETON.md` naming
+  "Hoeffding- or Chernoff-type." Hoeffding's inequality requires bounded
+  random variables; standardized, log-transformed RNA-Seq features are
+  effectively unbounded (approximately Gaussian). A chi-squared tail bound
+  (Laurent & Massart, 2000) was used instead -- the correct Chernoff-type
+  analogue for sums of squared sub-Gaussian coordinates -- and this
+  substitution is stated explicitly in both the module docstring and the
+  report's methodology section rather than silently mislabeled as
+  "Hoeffding."
+- *Zero Mahalanobis outliers were flagged at the chosen threshold, and
+  this null result was reported as-is rather than adjusting the threshold
+  to force a non-empty flagged set.* The observed mean squared Mahalanobis
+  distance (778.1) is only 38.9% of its nominal `chi^2_2000` expectation
+  (2,000), diagnosed as a direct consequence of Ledoit-Wolf's isotropic
+  shrinkage target compressing distances relative to the classical
+  asymptotic calibration, given the real spectrum's extreme heavy-tailedness
+  (eigenvalues from ~0 to 318.3). This is reported and explained in the
+  report's Discussion section as a methodological finding about shrinkage
+  estimators under `d >> n`, per the project's "do not fabricate metrics"
+  constraint, with the ten most-extreme samples reported descriptively
+  (by rank, not by formal significance) as a partial answer to the
+  cross-reference-against-class-labels requirement.
+- Verified end-to-end by running `run_pipeline.py` twice against the real
+  preprocessed data (once before, once after the `spectral_overlay_plot`
+  fix), visually inspecting all eight new Phase 3 figures before citing
+  them in the report, and cross-checking the empirical near-zero
+  eigenvalue fraction (60.00%) against the independently-derived
+  theoretical point-mass prediction (`1 - 1/gamma = 59.95%`) as a
+  correctness check on the spectral analysis implementation before
+  reporting it as a finding.
+- *`src/viz.py` (257 lines) and `run_pipeline.py` (243 lines) both exceed
+  the project's soft ~200-line-per-file guideline*, the same situation
+  Phase 2's `intrinsic_dimension.py` (222 lines) was in. This was again a
+  deliberate rejection of splitting: `SKELETON.md` fixes `viz.py` as the
+  single "shared plotting utilities" module for all phases and
+  `run_pipeline.py` as the single top-level orchestrator containing "no
+  analysis logic of its own," so fragmenting either along an arbitrary
+  line-count boundary would break the project's own specified
+  architecture for a ~20-25% overshoot, rather than a natural
+  module-responsibility split.

@@ -12,7 +12,20 @@ from pathlib import Path
 
 import numpy as np
 
-from src import config, data_loading, evaluation, intrinsic_dimension, preprocessing, synthetic, viz
+from src import (
+    anomaly_detection,
+    config,
+    data_loading,
+    embeddings,
+    evaluation,
+    geometry_diagnostics,
+    intrinsic_dimension,
+    preprocessing,
+    random_projection,
+    spectral_analysis,
+    synthetic,
+    viz,
+)
 
 
 def _estimate_all(X: np.ndarray, seed: int) -> dict:
@@ -128,6 +141,102 @@ def main():
         f"PCA@90%={real_results['pca']['n_components_at_threshold'][0.90]}, "
         f"kNN-MLE mean={real_results['knn']['mean_across_k']:.2f}."
     )
+
+    # --- Phase 3: PCA 2D/3D visualization ---
+    y_values = y.values
+    pca_viz = embeddings.run_pca(X_scaled_full, config.PCA_VIZ_N_COMPONENTS)
+    viz.scatter_embedding(
+        pca_viz["embedding"][:, :2], y_values, "PCA (2D) colored by cancer type",
+        str(Path(config.FIGURES_DIR) / "pca_2d.png"),
+    )
+    viz.scatter_embedding(
+        pca_viz["embedding"], y_values, "PCA (3D) colored by cancer type",
+        str(Path(config.FIGURES_DIR) / "pca_3d.png"),
+    )
+    pca_viz_cumvar = float(np.sum(pca_viz["explained_variance_ratio"]))
+    print(f"\nPhase 3 PCA viz: cumulative variance in top {config.PCA_VIZ_N_COMPONENTS} PCs = {pca_viz_cumvar:.4f}")
+
+    # --- Phase 3: t-SNE / UMAP hyperparameter comparisons ---
+    tsne_embeddings = embeddings.run_tsne(X_scaled_full, config.TSNE_PERPLEXITIES, config.RANDOM_SEED)
+    viz.embedding_hyperparam_comparison_plot(
+        tsne_embeddings, y_values, "perplexity", "t-SNE embeddings across perplexity values",
+        str(Path(config.FIGURES_DIR) / "tsne_comparison.png"),
+    )
+    umap_embeddings = embeddings.run_umap(X_scaled_full, config.UMAP_N_NEIGHBORS_VALUES, config.RANDOM_SEED)
+    viz.embedding_hyperparam_comparison_plot(
+        umap_embeddings, y_values, "n_neighbors", "UMAP embeddings across n_neighbors values",
+        str(Path(config.FIGURES_DIR) / "umap_comparison.png"),
+    )
+    print("Phase 3 t-SNE/UMAP comparison figures saved.")
+
+    # --- Phase 3: Johnson-Lindenstrauss random projection ---
+    jl_target_dim = random_projection.jl_target_dimension(X_scaled_full.shape[0], config.JL_EPSILON)
+    X_proj = random_projection.random_gaussian_projection(X_scaled_full, jl_target_dim, config.RANDOM_SEED)
+    jl_eval = random_projection.evaluate_distance_preservation(X_scaled_full, X_proj)
+    viz.jl_distortion_plot(
+        jl_eval["original_distances"], jl_eval["projected_distances"], jl_eval["distortion_ratios"],
+        config.JL_EPSILON, str(Path(config.FIGURES_DIR) / "jl_distortion.png"),
+    )
+    print(
+        f"Phase 3 JL projection: target_dim={jl_target_dim} (from d={X_scaled_full.shape[1]}), "
+        f"mean distortion={jl_eval['mean_distortion']:.4f}, max |deviation|={jl_eval['max_abs_deviation']:.4f}, "
+        f"fraction within eps={config.JL_EPSILON}: {jl_eval['frac_within_epsilon']:.4f}"
+    )
+
+    # --- Phase 3: spectral analysis (top-k genes) vs. Marchenko-Pastur ---
+    spectral_eigs = spectral_analysis.empirical_spectral_distribution(X_scaled_topk)
+    spectral_aspect_ratio = X_scaled_topk.shape[1] / X_scaled_topk.shape[0]
+    spectral_outliers = spectral_analysis.identify_spectral_outliers(spectral_eigs, spectral_aspect_ratio)
+    support_upper = spectral_outliers["support_upper"]
+    bulk_eigs = spectral_eigs[(spectral_eigs > 1e-8) & (spectral_eigs <= support_upper)]
+    grid = np.linspace(max(spectral_outliers["support_lower"] * 0.8, 1e-6), support_upper * 1.05, 1000)
+    mp_density_conditional = spectral_analysis.marchenko_pastur_density(spectral_aspect_ratio, grid) * spectral_aspect_ratio
+    viz.spectral_overlay_plot(
+        bulk_eigs, spectral_eigs, grid, mp_density_conditional, support_upper,
+        str(Path(config.FIGURES_DIR) / "spectral_overlay.png"),
+    )
+    print(
+        f"Phase 3 spectral analysis (top-{config.SPECTRAL_N_TOP_GENES} genes, aspect ratio="
+        f"{spectral_aspect_ratio:.3f}): MP support=[{spectral_outliers['support_lower']:.3f}, "
+        f"{spectral_outliers['support_upper']:.3f}], n_outliers={spectral_outliers['n_outliers']}, "
+        f"empirical near-zero fraction={spectral_outliers['frac_near_zero_empirical']:.4f} vs. "
+        f"theoretical point mass={spectral_outliers['point_mass_at_zero_theoretical']:.4f}"
+    )
+
+    # --- Phase 3: distance concentration / curse of dimensionality ---
+    geometry_feature_counts = config.GEOMETRY_FEATURE_COUNTS + [X_scaled_full.shape[1]]
+    concentration_results = geometry_diagnostics.pairwise_distance_concentration(
+        X_scaled_full, geometry_feature_counts, config.RANDOM_SEED
+    )
+    theoretical_bounds = {
+        count: geometry_diagnostics.theoretical_concentration_bound(count, config.GEOMETRY_CONCENTRATION_EPSILON)
+        for count in concentration_results
+    }
+    viz.distance_concentration_plot(
+        concentration_results, theoretical_bounds, str(Path(config.FIGURES_DIR) / "distance_concentration.png"),
+    )
+    print("Phase 3 distance concentration ratios:", {c: round(v["ratio"], 4) for c, v in concentration_results.items()})
+    print("Phase 3 theoretical concentration bounds:", {c: round(b, 6) for c, b in theoretical_bounds.items()})
+
+    # --- Phase 3: Ledoit-Wolf shrinkage covariance + Mahalanobis anomaly detection ---
+    cov_estimate = anomaly_detection.shrinkage_covariance(X_scaled_topk)
+    mahalanobis_threshold = anomaly_detection.chi_squared_threshold(X_scaled_topk.shape[1], config.MAHALANOBIS_ALPHA)
+    mahalanobis_result = anomaly_detection.mahalanobis_outliers(X_scaled_topk, cov_estimate, mahalanobis_threshold)
+    viz.mahalanobis_distribution_plot(
+        mahalanobis_result["distances_squared"], mahalanobis_threshold, y_values,
+        str(Path(config.FIGURES_DIR) / "mahalanobis_distribution.png"),
+    )
+    flagged_labels = y.iloc[mahalanobis_result["flagged_indices"]]
+    outlier_crosstab = flagged_labels.value_counts().rename("n_flagged").to_frame()
+    outlier_crosstab.to_csv(Path(config.FIGURES_DIR) / "mahalanobis_outliers_by_class.csv")
+    print(
+        f"Phase 3 anomaly detection: shrinkage={cov_estimate['shrinkage']:.4f}, "
+        f"threshold(chi2, alpha={config.MAHALANOBIS_ALPHA})={mahalanobis_threshold:.2f}, "
+        f"n_flagged={len(mahalanobis_result['flagged_indices'])}/{X_scaled_topk.shape[0]}"
+    )
+    print("Flagged outliers by class:\n", outlier_crosstab.to_string())
+
+    print("\nPhase 3 complete.")
 
 
 if __name__ == "__main__":
