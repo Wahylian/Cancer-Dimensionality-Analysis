@@ -70,7 +70,7 @@ The course's six graded highlights are mapped to explicit, checkable requirement
 6. **Anomaly detection (supporting analysis):** Using a shrinkage covariance estimator (e.g., Ledoit–Wolf) — required because the raw sample covariance is singular for d ≫ n — compute Mahalanobis distances for all samples and flag outliers using an explicit, justified threshold (e.g., chi-squared quantile). Cross-reference flagged outliers against cancer-type labels and discuss whether they correspond to any known biological subtype ambiguity or are likely technical artifacts.
 7. **Justify in report:** hyperparameter choices for t-SNE/UMAP, JL target-dimension derivation, feature-subset choice for the spectral analysis, and the anomaly-detection threshold.
 
-### Phase 4 — Evaluation, Synthesis & Reporting
+### Phase 4 — Evaluation, Synthesis & Reporting - DONE
 1. Synthesize Phases 2–3 into a single coherent narrative: does the estimated intrinsic dimension (Phase 2) roughly match the number of components needed for the visual/geometric structure observed in Phase 3? Reconcile any apparent contradictions explicitly.
 2. Provide a summary table consolidating: ambient dimension, all intrinsic dimension estimates (real vs. synthetic baselines), variance explained at key PCA cutoffs, JL empirical distortion vs. theoretical bound, and number of Mahalanobis-flagged outliers.
 3. Discuss limitations explicitly: small sample size per class (esp. COAD, n≈78), potential batch effects in TCGA data, and the fact that RNA-Seq correlation structure may violate i.i.d. assumptions underlying some theoretical bounds.

@@ -310,3 +310,96 @@ Phase 1.
   line-count boundary would break the project's own specified
   architecture for a ~20-25% overshoot, rather than a natural
   module-responsibility split.
+
+## Phase 4 — Evaluation, Synthesis & Reporting
+
+**Files/functions generated with AI assistance:**
+- `reports/phase_4.tex` — full Phase 4 synthesis report (new file;
+  `reports/` already existed from Phases 1--3, so no directory creation
+  was required)
+- `ai_usage_log.md` — this Phase 4 section
+
+No `src/*.py` changes were made this phase. `src/evaluation.py`'s two
+required functions (`build_intrinsic_dimension_summary_table()`,
+`reconcile_estimators()`) were inspected first and found already fully
+implemented (from Phase 2) and already exercised by `run_pipeline.py`,
+with their output cached at `data/processed/phase2_reconciliation.txt` and
+`figures/phase2_summary_table.csv`. Per the driving task's own instruction
+("implement... only if missing"), no code changes to `evaluation.py` were
+made.
+
+**Representative prompts (paraphrased from the driving instruction set):**
+1. "Read `project_framework/{IDEA,INSTRUCTIONS,SKELETON}.md` and confirm
+   `src/evaluation.py` already implements the Phase 4 summary-table and
+   reconciliation functions required by `SKELETON.md` before writing
+   anything; do not implement them again if present."
+2. "Retrieve every empirical number needed for the Phase 4 report directly
+   from cached Phase 1--3 artifacts (`data/processed/*.json`,
+   `data/processed/phase2_reconciliation.txt`, `figures/*.csv`, and the
+   already-written `reports/phase_{1,2,3}.tex`) rather than recomputing or
+   estimating them."
+3. "Write `reports/phase_4.tex`: a synthesis narrative reconciling all four
+   independent intrinsic-dimension estimates (correlation dimension, k-NN
+   MLE, Marchenko-Pastur spectral outliers, Kaiser/90%-variance PCA) with
+   Phase 3's visual finding that linear PCA needs far more components than
+   any of them suggest for cluster separation; a single consolidated
+   summary table; an explicit limitations section (COAD's small n, TCGA
+   batch effects, gene co-expression violating i.i.d. assumptions); and a
+   concrete future-work section."
+4. "No raw code dumps in the report; no fabricated numbers -- every cell of
+   the consolidated table and every prose claim must trace to a specific
+   number already computed and printed/cached in Phases 1--3."
+
+**What was changed, corrected, or rejected from the AI-drafted output, and why:**
+- *An initial table draft populated the Johnson-Lindenstrauss, spectral
+  outlier, and Mahalanobis rows with invented "N/A" placeholder numbers for
+  the Gaussian-noise and linear-manifold baselines rather than an honest
+  "--".* This was rejected: Phase 3's own report explicitly scopes these
+  three diagnostics to the real dataset (and its top-2,000-gene subset)
+  only, since their purpose is to test whether *this specific, biologically
+  structured* dataset departs from random-matrix/i.i.d. expectations, which
+  is not a meaningful question to ask of a baseline that has no biological
+  structure by construction. The table and surrounding prose were corrected
+  to state this scope decision explicitly as inherited from Phase 3, rather
+  than silently leaving blank cells or inventing baseline runs that were
+  never executed.
+- *The synthesis section's central claim -- that intrinsic dimension
+  "roughly matches" the number of components needed for visual separation
+  -- was corrected from an initial overly simple "yes, it matches (Kaiser
+  elbow ~100 vs. D2 ~7.7, same order of magnitude)" framing to a more
+  precise reconciliation.* On inspection this initial framing conflated two
+  different quantities: the Kaiser elbow (100) is a full-unfiltered-feature
+  linear estimate, and is not actually close to D2 (7.73) or the k-NN MLE
+  mean (29.36) by any reasonable standard (13x and 3.4x larger,
+  respectively). The corrected argument instead identifies the
+  EMBEDDING_PCA_PREPROCESS_DIM=50 value (Phase 3's own t-SNE/UMAP
+  preprocessing dimension, config.py) as the more defensible bridge
+  quantity -- the smallest linear subspace shown to be sufficient
+  substrate for nonlinear recovery of the true cluster structure -- and
+  explains why this is a different, smaller-order concept than "number of
+  linear PCs sufficient for direct visual separation via raw projection,"
+  which the report shows is a strictly larger quantity governed by
+  manifold curvature, not intrinsic dimension itself.
+- *Rejected including a code snippet showing `build_intrinsic_dimension_summary_table()`'s
+  implementation*, even though the task constraints permit snippets
+  `<= 15` lines "if absolutely essential." The function's behavior is
+  already fully described by Table 1 and prose; a code excerpt would add
+  no interpretive value the constraints require of every included element
+  and would risk being read as a "raw code dump," which is explicitly
+  prohibited.
+- *`reports/phase_4.tex` (comparable in length to Phases 2--3's ~370--590
+  line reports) was written as a single file rather than split*, matching
+  the project's own established one-file-per-phase-report convention
+  (`phase_1.tex`, `phase_2.tex`, `phase_3.tex` are all single files,
+  368--593 lines). Splitting a single academic report document across
+  multiple files would break LaTeX compilation as a standalone document
+  (an explicit task requirement) for no benefit, the same category of
+  deliberate non-split decision documented for `viz.py` and
+  `intrinsic_dimension.py` in the Phase 2--3 entries above.
+- Verified every numeric value cited in `reports/phase_4.tex` against its
+  source artifact before writing it into the table or prose (cross-checked
+  `figures/phase2_summary_table.csv`, `data/processed/phase2_reconciliation.txt`,
+  `data/processed/validation_summary.json`, `figures/mahalanobis_outliers_by_class.csv`,
+  and the numeric claims embedded in `reports/phase_{1,2,3}.tex`), rather
+  than transcribing from memory; no python code was executed this phase
+  since all required numbers were already cached from Phases 1--3 runs.
