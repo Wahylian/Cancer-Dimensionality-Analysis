@@ -135,9 +135,17 @@ def _kaiser_elbow(eigenvalues: np.ndarray) -> int:
 
 
 def _curvature_elbow(explained_variance_ratio: np.ndarray) -> int:
-    """Second-derivative elbow: index of maximum curvature in the scree curve."""
+    """Second-derivative elbow: index of maximum curvature in the scree curve.
+
+    A scree curve is decreasing and convex, so its discrete second difference
+    is non-negative and peaks where the steep initial drop flattens out --
+    the elbow. Taking the maximum of the *negated* second difference instead
+    would locate the point of maximum concavity, which on such a curve is not
+    an elbow at all (on the 5-D manifold baseline it returns 4 rather than 5,
+    and on isotropic noise it returns the final index).
+    """
     second_derivative = np.diff(explained_variance_ratio, n=2)
-    return int(np.argmax(-second_derivative)) + 1
+    return int(np.argmax(second_derivative)) + 1
 
 
 def pca_based_dimension(X: np.ndarray, variance_thresholds: list) -> dict:
@@ -145,8 +153,8 @@ def pca_based_dimension(X: np.ndarray, variance_thresholds: list) -> dict:
 
     Numerical note
     ---------------
-    With d=20,531 >> n=801, the (d x d) sample covariance matrix is never
-    formed explicitly (it would require ~3.4 GB and is rank-deficient with
+    With d=20,264 >> n=801, the (d x d) sample covariance matrix is never
+    formed explicitly (it would require ~3.3 GB and is rank-deficient with
     rank <= n-1). Instead the economy SVD of the centered (n x d) data
     matrix is used: eigenvalues of the covariance equal S^2 / (n-1) for
     singular values S, giving all min(n, d) non-trivial eigenvalues exactly.

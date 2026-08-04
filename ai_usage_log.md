@@ -6,9 +6,11 @@ phase is completed.
 
 ## Tool
 
-**Claude Code** (Anthropic), model Claude Sonnet 5, CLI agent with direct
+**Claude Code** (Anthropic), model Claude Sonnet 5 & Claude Opus 5, CLI agent with direct
 read/write/execute access to this repository. Used for the majority of code
 generation, the Phase 1 LaTeX report, and this log itself.
+**Google's Gemini** (Google), model Gemini Pro, used to optimise prompts that were provided for Claude Code.
+
 
 ## Phase 0 — Environment & Reproducibility
 
@@ -403,3 +405,22 @@ made.
   and the numeric claims embedded in `reports/phase_{1,2,3}.tex`), rather
   than transcribing from memory; no python code was executed this phase
   since all required numbers were already cached from Phases 1--3 runs.
+
+## Phase 5 — Project Report Review Pass
+
+**Tool:** Claude Code (Anthropic), model Claude Opus 5, same repository access.
+
+**Driving prompt:** The agent was instructed to conduct a comprehensive audit of the project report, document any identified issues along with their root causes, and propose specific remedies. It was explicitly directed to provide detailed explanations for every problem and require user approval before applying any fixes.
+
+**What the agent did:** audited every quantitative claim in the report against the code that produced it (`src/*.py`, `run_pipeline.py`) and against the cached artifacts, then applied approved fixes and re-ran the pipeline. Scope was agreed in advance: fix the report and the `src/` root causes, but implement no new analyses — unsupported claims were retired and moved to Future Work rather than backed by new experiments. `reports/phase_{1,2,3,4}.tex` were deliberately left untouched as the historical per-phase record, so they still contain the pre-correction numbers.
+
+**Code defects found and fixed:**
+- `src/intrinsic_dimension.py::_curvature_elbow` computed `argmax(-second_derivative)`, i.e. the *minimum* of the second difference. A scree curve is convex-decreasing, so the elbow is the maximum. The sign inversion made all three reported curvature elbows meaningless; the corrected version returns 5 on the manifold baseline (ground truth 5, previously 4), 54 on Gaussian noise (previously 799, the final index), and 3 on the real data (previously 2).
+- `run_pipeline.py` thresholded Mahalanobis distances against chi-squared with df = 2000 (the feature count). With p=2000 > n=801 the statistic is confined by rank to 800 dimensions, and its mean is bounded above by (n-1)/(1-alpha) = 819.6 regardless of the data, so the 97.5% quantile of chi2_2000 (2125.84) could never be reached. Changed to df = n-1 = 800 (threshold 880.28). The result is still zero flagged samples, but it is now a test that could have failed: the most extreme sample reaches 91.3% of the threshold.
+- `run_pipeline.py` ran the estimators on unstandardized synthetic baselines while the real data was standardized, contradicting the report's claim that all three datasets took an identical path. Both baselines are now standardized.
+- `run_pipeline.py` used aspect ratio p/n for the Marchenko-Pastur comparison. Because standardization centres each column, the correct ratio is p/(n-1) = 2.500, which makes the point-mass prediction exactly 60.00% — matching the empirical value exactly rather than approximately.
+- `src/config.py` documented the eps=0.1 Johnson-Lindenstrauss target dimension as ~5732; the formula gives ceil(5730.74) = 5731.
+
+**Additions for traceability (no analysis logic changed):** `run_pipeline.py` now prints the PCA elbow criteria per dataset, the correlation-dimension scaling region, the ten largest spectral outliers and their share of the trace, the Mahalanobis distance summary and top-ten samples, and a `_manifold_noise_sweep()` reproducing the noise-sensitivity table that had previously been generated ad hoc and was left stale by the standardization fix.
+
+**Report claims retired, not fixed:** the review found several assertions that no computed quantity supported. Rather than run new experiments, these were weakened to what the evidence shows and listed as future work: the "near-perfect five-cluster structure" of the t-SNE/UMAP embeddings (never measured — no clustering metric exists in `src/`); the claim that cluster *membership* is invariant across hyperparameters (unmeasurable from two scatter plots); "50 components, and no more" as a quantitative bridge (50 was a fixed default, never swept); the framing of Johnson-Lindenstrauss satisfaction as evidence of low dimensionality (it holds for any point set, including pure noise); the attribution of the Kaiser-elbow/MP-outlier gap to gene filtering (two variables changed at once); and the treatment of the MP outlier count as a fourth independent intrinsic-dimension estimator (it is not one, was never calibrated against the baselines, and depends on the arbitrary k=2000).

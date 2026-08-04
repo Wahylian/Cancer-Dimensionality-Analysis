@@ -38,6 +38,32 @@ def _estimate_all(X: np.ndarray, seed: int) -> dict:
     }
 
 
+def _manifold_noise_sweep(n_samples: int, n_features: int, noise_levels: list, seed: int) -> None:
+    """Print estimator behaviour on the manifold baseline across noise levels.
+
+    Motivates config.MANIFOLD_NOISE_STD: the additive noise contributes
+    n_features * sigma^2 of total variance against only MANIFOLD_INTRINSIC_DIM
+    from signal, so "small" sigma must be judged relative to the ambient
+    dimension. Preprocessing matches the main run so the sigma chosen there is
+    directly comparable to the summary table.
+    """
+    print("\nPhase 2 manifold-baseline noise sensitivity (true dimension "
+          f"{config.MANIFOLD_INTRINSIC_DIM}):")
+    for sigma in noise_levels:
+        X = preprocessing.standardize(
+            synthetic.generate_low_dim_manifold_baseline(
+                n_samples, n_features, config.MANIFOLD_INTRINSIC_DIM, sigma, seed
+            )
+        )
+        res = _estimate_all(X, seed)
+        print(
+            f"  sigma={sigma:<7} D2={res['correlation']['D2']:>7.2f}  "
+            f"kaiser={res['pca']['elbow_kaiser']:>4}  "
+            f"PCA@90={res['pca']['n_components_at_threshold'][0.90]:>4}  "
+            f"kNN-MLE(k=10)={res['knn']['per_k'][10]['mean_dimension']:>8.2f}"
+        )
+
+
 def main():
     Path(config.PROCESSED_DIR).mkdir(parents=True, exist_ok=True)
     Path(config.FIGURES_DIR).mkdir(parents=True, exist_ok=True)
@@ -98,10 +124,18 @@ def main():
     )
 
     # --- Phase 2: synthetic baselines, matched in shape to the real full matrix ---
+    # Both baselines are standardized like the real data, so the estimators see
+    # one identical preprocessing path across all three datasets. Without this the
+    # manifold baseline would be calibrated on unscaled coordinates while the real
+    # data is z-scored, making the comparison an unequal one.
     n_samples, n_features = X_scaled_full.shape
-    noise_baseline = synthetic.generate_gaussian_noise_baseline(n_samples, n_features, config.RANDOM_SEED)
-    manifold_baseline = synthetic.generate_low_dim_manifold_baseline(
-        n_samples, n_features, config.MANIFOLD_INTRINSIC_DIM, config.MANIFOLD_NOISE_STD, config.RANDOM_SEED
+    noise_baseline = preprocessing.standardize(
+        synthetic.generate_gaussian_noise_baseline(n_samples, n_features, config.RANDOM_SEED)
+    )
+    manifold_baseline = preprocessing.standardize(
+        synthetic.generate_low_dim_manifold_baseline(
+            n_samples, n_features, config.MANIFOLD_INTRINSIC_DIM, config.MANIFOLD_NOISE_STD, config.RANDOM_SEED
+        )
     )
 
     # --- Phase 2: run all three estimators on real data and both baselines ---
@@ -135,6 +169,15 @@ def main():
 
     print("\nPhase 2 intrinsic dimension summary:")
     print(summary_table.to_string())
+    print("\nPhase 2 PCA elbow criteria (component index):")
+    for name, res in {"Real (RNA-Seq)": real_results, **synthetic_results}.items():
+        print(f"  {name}: kaiser={res['pca']['elbow_kaiser']}, curvature={res['pca']['elbow_curvature']}")
+    print(
+        f"Phase 2 correlation-dimension scaling region (real): "
+        f"[{real_results['correlation']['scaling_region'][0]:.1f}, "
+        f"{real_results['correlation']['scaling_region'][1]:.1f}]"
+    )
+    _manifold_noise_sweep(n_samples, n_features, [0.1, 0.01, 0.001], config.RANDOM_SEED)
     print("\nReconciliation:\n" + reconciliation)
     print(
         f"\nPhase 2 complete. Real data: D2={real_results['correlation']['D2']:.2f}, "
@@ -185,7 +228,10 @@ def main():
 
     # --- Phase 3: spectral analysis (top-k genes) vs. Marchenko-Pastur ---
     spectral_eigs = spectral_analysis.empirical_spectral_distribution(X_scaled_topk)
-    spectral_aspect_ratio = X_scaled_topk.shape[1] / X_scaled_topk.shape[0]
+    # Columns are mean-centred, so the correlation matrix carries n-1 effective
+    # degrees of freedom, not n. Using n would put the MP point mass at 59.95%
+    # against an empirical 60.00% that is in fact exact.
+    spectral_aspect_ratio = X_scaled_topk.shape[1] / (X_scaled_topk.shape[0] - 1)
     spectral_outliers = spectral_analysis.identify_spectral_outliers(spectral_eigs, spectral_aspect_ratio)
     support_upper = spectral_outliers["support_upper"]
     bulk_eigs = spectral_eigs[(spectral_eigs > 1e-8) & (spectral_eigs <= support_upper)]
@@ -202,6 +248,9 @@ def main():
         f"empirical near-zero fraction={spectral_outliers['frac_near_zero_empirical']:.4f} vs. "
         f"theoretical point mass={spectral_outliers['point_mass_at_zero_theoretical']:.4f}"
     )
+    top10_eigs = spectral_outliers["outlier_eigenvalues"][:10]
+    print("Phase 3 ten largest spectral outliers:", " ".join(f"{e:.2f}" for e in top10_eigs))
+    print(f"Phase 3 outlier eigenvalue mass: {top10_eigs.sum():.2f} of trace {spectral_eigs.sum():.0f}")
 
     # --- Phase 3: distance concentration / curse of dimensionality ---
     geometry_feature_counts = config.GEOMETRY_FEATURE_COUNTS + [X_scaled_full.shape[1]]
@@ -220,7 +269,12 @@ def main():
 
     # --- Phase 3: Ledoit-Wolf shrinkage covariance + Mahalanobis anomaly detection ---
     cov_estimate = anomaly_detection.shrinkage_covariance(X_scaled_topk)
-    mahalanobis_threshold = anomaly_detection.chi_squared_threshold(X_scaled_topk.shape[1], config.MAHALANOBIS_ALPHA)
+    # Degrees of freedom are the rank of the centred sample covariance (n-1), not the
+    # feature count: with p=2000 > n=801 the squared distances live in an 800-dim
+    # subspace and their mean is bounded by (n-1)/(1-shrinkage) regardless of the data,
+    # so a chi^2_p threshold sits above the statistic's mathematical ceiling.
+    mahalanobis_dof = X_scaled_topk.shape[0] - 1
+    mahalanobis_threshold = anomaly_detection.chi_squared_threshold(mahalanobis_dof, config.MAHALANOBIS_ALPHA)
     mahalanobis_result = anomaly_detection.mahalanobis_outliers(X_scaled_topk, cov_estimate, mahalanobis_threshold)
     viz.mahalanobis_distribution_plot(
         mahalanobis_result["distances_squared"], mahalanobis_threshold, y_values,
@@ -229,11 +283,19 @@ def main():
     flagged_labels = y.iloc[mahalanobis_result["flagged_indices"]]
     outlier_crosstab = flagged_labels.value_counts().rename("n_flagged").to_frame()
     outlier_crosstab.to_csv(Path(config.FIGURES_DIR) / "mahalanobis_outliers_by_class.csv")
+    d2 = mahalanobis_result["distances_squared"]
     print(
         f"Phase 3 anomaly detection: shrinkage={cov_estimate['shrinkage']:.4f}, "
-        f"threshold(chi2, alpha={config.MAHALANOBIS_ALPHA})={mahalanobis_threshold:.2f}, "
+        f"threshold(chi2, dof={mahalanobis_dof}, alpha={config.MAHALANOBIS_ALPHA})={mahalanobis_threshold:.2f}, "
         f"n_flagged={len(mahalanobis_result['flagged_indices'])}/{X_scaled_topk.shape[0]}"
     )
+    print(
+        f"Phase 3 squared Mahalanobis distances: min={d2.min():.2f}, max={d2.max():.2f}, "
+        f"mean={d2.mean():.2f}, std={d2.std():.2f}"
+    )
+    print("Phase 3 ten largest squared Mahalanobis distances:")
+    for rank in np.argsort(d2)[::-1][:10]:
+        print(f"  {y.index[rank]}  {y.iloc[rank]}  {d2[rank]:.2f}")
     print("Flagged outliers by class:\n", outlier_crosstab.to_string())
 
     print("\nPhase 3 complete.")

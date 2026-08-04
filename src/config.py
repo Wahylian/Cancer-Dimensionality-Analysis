@@ -51,7 +51,7 @@ UMAP_N_NEIGHBORS_VALUES = [15, 50]
 # Johnson-Lindenstrauss random projection: target distortion epsilon. 0.2 is
 # chosen over the more conservative textbook default of 0.1 because, at
 # n=801, the Dasgupta-Gupta bound k >= 4 ln(n) / (eps^2/2 - eps^3/3) scales
-# as 1/eps^2 and eps=0.1 yields a target dimension (~5732) that barely
+# as 1/eps^2 and eps=0.1 yields a target dimension (5731) that barely
 # compresses the d=20,264 ambient space, obscuring the demonstration; 0.2
 # yields a still-tight, standard distortion tolerance with a much more
 # illustrative ~13x reduction.
