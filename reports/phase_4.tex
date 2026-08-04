@@ -44,7 +44,7 @@ A consolidated table collects every diagnostic computed across Phases 2--3
 baselines, PCA variance cutoffs, Johnson--Lindenstrauss empirical distortion
 ($\bar\rho = 0.9996$, $100\%$ of pairs within the theoretical $\varepsilon =
 0.2$ bound), and Mahalanobis outlier counts ($0$ of $801$ samples at a
-$97.5\%$ $\chi^2_{2000}$ threshold). We close with an explicit discussion of
+$97.5\%$ $\chi^2_{800}$ threshold, the rank of the estimator). We close with an explicit discussion of
 methodological limitations (COAD's $n \approx 78$, TCGA multi-center batch
 effects, and gene co-expression's violation of the i.i.d.\ assumptions
 underlying Marchenko--Pastur and the Laurent--Massart concentration bound)
@@ -91,8 +91,8 @@ Eq.~\ref{eq:lb-recap}), against a Kaiser-criterion PCA elbow of $100$
 components and $392$ components needed for $90\%$ cumulative linear
 variance. Phase 3 then added a fourth, independent estimate: of the
 $2{,}000$ eigenvalues of the top-$2{,}000$-gene correlation matrix, $27$
-exceed the Marchenko--Pastur theoretical bulk edge $b = 6.657$ at aspect
-ratio $\gamma = 2.497$ -- eigenvalues that cannot be explained by an
+exceed the Marchenko--Pastur theoretical bulk edge $b = 6.662$ at aspect
+ratio $\gamma = 2.500$ -- eigenvalues that cannot be explained by an
 unstructured random matrix of matching shape and are therefore attributable
 to genuine covariance structure, not noise.
 
@@ -276,22 +276,22 @@ baselines (matched in shape to $n=801$, $d=20{,}264$).}
 Ambient dimension $d$ (raw, pre-filter) & 20{,}531 & -- & -- \\
 Analysis dimension $d$ (post zero-var.\ filter) & 20{,}264 & 20{,}264 & 20{,}264 \\
 True intrinsic dimension (by construction) & unknown & $\approx d$ (none) & 5 \\
-Correlation dimension $\hat D_2$ ($R^2$) & 7.73 (1.000) & 49.02 (0.998) & 4.63 (1.000) \\
-$k$-NN MLE mean, $k \in \{5,10,20\}$ & 29.36 & 619.35 & 5.27 \\
-\quad$k$-NN MLE ($k=5$) & 33.16 & 656.95 & 5.44 \\
-\quad$k$-NN MLE ($k=10$) & 29.55 & 618.75 & 5.28 \\
-\quad$k$-NN MLE ($k=20$) & 25.37 & 582.36 & 5.09 \\
+Correlation dimension $\hat D_2$ ($R^2$) & 7.73 (1.000) & 419.52 (1.000) & 4.29 (1.000) \\
+$k$-NN MLE mean, $k \in \{5,10,20\}$ & 29.36 & 610.36 & 5.44 \\
+\quad$k$-NN MLE ($k=5$) & 33.16 & 626.09 & 5.69 \\
+\quad$k$-NN MLE ($k=10$) & 29.55 & 621.67 & 5.42 \\
+\quad$k$-NN MLE ($k=20$) & 25.37 & 583.31 & 5.20 \\
 Kaiser-criterion PCA elbow (components) & 100 & 386 & 5 \\
-Curvature-criterion PCA elbow (components) & 2 & 799 & 4 \\
+Curvature-criterion PCA elbow (components) & 3 & 54 & 5 \\
 PCA components for 90\% variance & 392 & 688 & 5 \\
 PCA components for 95\% variance & 548 & 742 & 5 \\
 PCA components for 99\% variance & 732 & 788 & 5 \\
-MP spectral outlier count (top-2,000 genes, $\gamma=2.497$) & 27 & -- & -- \\
+MP spectral outlier count (top-2,000 genes, $\gamma=2.500$) & 27 & -- & -- \\
 JL target dimension $k$ ($\varepsilon=0.2$, Eq.~\ref{eq:jl-recap}) & 1{,}543 & -- & -- \\
 JL empirical mean distortion $\bar\rho$ & 0.9996 & -- & -- \\
 JL max $|\rho - 1|$ (theoretical bound: $0.2$) & 0.0808 & -- & -- \\
 JL fraction of pairs within $(1\pm\varepsilon)$ bound & 100\% & -- & -- \\
-Mahalanobis-flagged outliers ($\alpha=0.025$, $n=801$) & 0 & -- & -- \\
+Mahalanobis-flagged outliers ($\alpha=0.025$, $\mathrm{df}=800$) & 0 & -- & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -336,7 +336,7 @@ $300$ of $801$ samples ($37.45\%$) while COAD accounts for only $78$
 ($9.74\%$, Phase 1, Table~2). Every class-conditional or cross-referenced
 claim made in this project -- the visual cluster-purity assessment in
 Phase 3, the class breakdown of the ten most-extreme Mahalanobis-distance
-samples (5 BRCA, 3 LUAD, 2 KIRC, $0$ PRAD/COAD, Phase 3, Table~7) -- carries
+samples (4 BRCA, 3 LUAD, 3 KIRC, $0$ PRAD/COAD, Phase 3, Table~7) -- carries
 substantially more sampling uncertainty for COAD than for BRCA. With
 $n_{\text{COAD}} \approx 78$, any claim of the form ``COAD samples are/are
 not disproportionately represented among outliers'' has wide confidence
@@ -447,12 +447,14 @@ most directly strengthen the project's conclusions:
   matched noise in $\mathbb{R}^{20{,}264}$ -- would let every estimator's
   behavior under \emph{curvature} be calibrated directly, rather than
   inferred indirectly as in Section~\ref{sec:synthesis}.
-  \item \textbf{Permutation-calibrated Mahalanobis threshold.} As noted in
-  Phase 3's Limitations, the $\chi^2_{2000}$ threshold assumes asymptotic
-  multivariate normality of $D^2$ under the fitted covariance, an
-  approximation Phase 3 shows is violated under heavy shrinkage (observed
-  mean $D^2 = 778.1$ is only $38.9\%$ of the nominal $\chi^2_{2000}$
-  expectation). A permutation-based null (recomputing $D^2$ under
+  \item \textbf{Permutation-calibrated Mahalanobis threshold.} The
+  $\chi^2_{800}$ threshold (correctly set at the rank of the estimator,
+  $\mathrm{df}=n-1=800$, rather than the feature count $p=2{,}000$) still
+  assumes asymptotic multivariate normality of $D^2$. Because the mean and
+  covariance used to score each sample are estimated from the same $801$
+  samples being scored, the exact reference distribution is a scaled Beta
+  rather than a $\chi^2$ at any degrees of freedom, and shrinkage perturbs
+  it further. A permutation-based null (recomputing $D^2$ under
   row-shuffled or resampled data to build an empirical threshold) would
   replace this asymptotic approximation with a threshold calibrated
   directly against this dataset's own shrinkage-distorted distribution.

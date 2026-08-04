@@ -37,15 +37,17 @@ $d=20{,}264$) preserves all pairwise distances within the theoretical bound,
 with $100\%$ of pairs falling inside $(1 \pm \varepsilon)$ and a maximum
 observed deviation of only $0.081$. The empirical correlation-matrix
 spectrum of the top $2{,}000$ genes matches the Marchenko--Pastur point-mass
-prediction at zero almost exactly ($60.00\%$ empirical vs.\ $59.95\%$
+prediction at zero exactly ($60.00\%$ empirical vs.\ $60.00\%$
 theoretical) while exhibiting $27$ eigenvalues (up to $318.3$) far beyond
 the theoretical bulk edge at $6.66$ -- direct evidence of real biological
 covariance structure. Pairwise-distance concentration collapses sharply
 with dimension (relative spread ratio $51.79 \to 4.96$ from $10$ to
 $20{,}264$ features) but saturates well above the $i.i.d.$-Gaussian
 theoretical rate, and Ledoit--Wolf/Mahalanobis anomaly detection (shrinkage
-intensity $0.024$) flags zero samples at a $97.5\%$ chi-squared threshold,
-a conservative result attributable to the shrinkage estimator itself.
+intensity $0.024$) flags zero samples at a $97.5\%$ chi-squared threshold
+computed at the estimator's true rank ($\mathrm{df}=n-1=800$), a threshold
+the mean squared distance is structurally close to by construction of the
+$p>n$ geometry.
 \end{abstract}
 
 \section{Introduction}
@@ -176,10 +178,14 @@ of genuine, non-random covariance structure.
 $20{,}264 \times 20{,}264$ correlation matrix would occupy $\sim 3.3$~GB and
 is never formed, mirroring Phase 2's PCA estimator. The top-$2{,}000$
 variable-gene subset (already cached from Phase 1, aspect ratio
-$\gamma = 2{,}000/801 \approx 2.497$) is a $2{,}000 \times 2{,}000$
+$\gamma = 2{,}000/800 = 2.500$) is a $2{,}000 \times 2{,}000$
 ($\sim 32$~MB) matrix, trivial to diagonalize exactly, while retaining the
 genes carrying the most biological signal -- precisely the genes most
-likely to produce interpretable spectral outliers.
+likely to produce interpretable spectral outliers. The denominator is
+$n-1=800$, not $n=801$, because standardization centers each column,
+which costs one degree of freedom; using $n$ instead would put $\gamma$
+at $2.497$ and misstate the point-mass prediction as an approximate match
+rather than the exact one it in fact is.
 
 \subsection{Curse of Dimensionality: Distance Concentration}
 
@@ -361,8 +367,8 @@ distortion is roughly $2.5\times$ tighter than the bound requires.
 \centering
 \includegraphics[width=\textwidth]{../figures/spectral_overlay.png}
 \caption{Left: empirical bulk spectrum (eigenvalues within the theoretical
-support $[0.34, 6.66]$) vs.\ the Marchenko-Pastur density
-(Eq.~\ref{eq:mp-density}, $\gamma=2.497$), rescaled to the conditional
+support $[0.338, 6.662]$) vs.\ the Marchenko-Pastur density
+(Eq.~\ref{eq:mp-density}, $\gamma=2.500$), rescaled to the conditional
 (nonzero) distribution. Right: full spectrum on a log-count axis, showing
 $27$ outlier eigenvalues far beyond the theoretical upper edge (dashed
 line).}
@@ -372,7 +378,7 @@ line).}
 \begin{table}[H]
 \centering
 \caption{Ten largest spectral outlier eigenvalues (top-2,000-gene
-correlation matrix, $\gamma=2.497$, theoretical support $[0.337, 6.657]$).}
+correlation matrix, $\gamma=2.500$, theoretical support $[0.338, 6.662]$).}
 \label{tab:spectral-outliers}
 \begin{tabular}{lrrrrrrrrrr}
 \toprule
@@ -383,12 +389,12 @@ Eigenvalue & 318.34 & 202.87 & 191.98 & 131.53 & 62.10 & 46.16 & 27.95 & 22.69 &
 \end{tabular}
 \end{table}
 
-The point-mass prediction is confirmed almost exactly: $60.00\%$ of the
+The point-mass prediction is confirmed exactly: $60.00\%$ of the
 $2{,}000$ eigenvalues are numerically zero, against a theoretical
-prediction of $1 - 1/\gamma = 59.95\%$ (the small excess reflects the
-centered data matrix's rank being $n-1=800$ rather than $n=801$). Of the
+prediction of $1 - 1/\gamma = 60.00\%$ at the correct aspect ratio
+$\gamma=2{,}000/800=2.500$. Of the
 remaining nonzero eigenvalues, $27$ ($1.35\%$ of all $2{,}000$) exceed the
-theoretical bulk edge $b=6.657$ (Table~\ref{tab:spectral-outliers}), the
+theoretical bulk edge $b=6.662$ (Table~\ref{tab:spectral-outliers}), the
 largest reaching $318.3$ -- roughly $48\times$ the bulk edge. The bulk
 histogram (Figure~\ref{fig:spectral}, left) broadly overlaps the
 Marchenko-Pastur support but is visibly more concentrated at small
@@ -445,44 +451,48 @@ few hundred genes are included.
 \includegraphics[width=0.65\textwidth]{../figures/mahalanobis_distribution.png}
 \caption{Distribution of squared Mahalanobis distances (top-2,000-gene
 subset, Ledoit-Wolf shrinkage) across all 801 samples, with the
-$\chi^2_{2000}$ $97.5\%$-quantile outlier threshold marked.}
+$\chi^2_{800}$ $97.5\%$-quantile outlier threshold marked.}
 \label{fig:mahalanobis}
 \end{figure}
 
 \begin{table}[H]
 \centering
 \caption{Ten samples with the largest squared Mahalanobis distance (none
-exceed the formal outlier threshold of 2125.84).}
+exceed the formal outlier threshold of 880.28).}
 \label{tab:mahalanobis-top10}
 \begin{tabular}{lrr}
 \toprule
 Sample & Cancer type & Squared Mahalanobis distance \\
 \midrule
-sample\_560 & BRCA & 803.64 \\
-sample\_250 & BRCA & 801.97 \\
+sample\_560 & BRCA & 803.66 \\
+sample\_250 & BRCA & 801.93 \\
 sample\_599 & LUAD & 801.87 \\
-sample\_322 & KIRC & 801.78 \\
+sample\_322 & KIRC & 801.85 \\
 sample\_789 & KIRC & 801.69 \\
-sample\_497 & BRCA & 801.21 \\
-sample\_577 & LUAD & 800.21 \\
+sample\_497 & BRCA & 801.20 \\
+sample\_577 & LUAD & 800.19 \\
 sample\_389 & BRCA & 799.99 \\
-sample\_406 & BRCA & 799.91 \\
-sample\_343 & LUAD & 799.90 \\
+sample\_77  & KIRC & 799.92 \\
+sample\_343 & LUAD & 799.92 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The Ledoit-Wolf shrinkage intensity is $\hat\alpha = 0.0239$ -- a light
 correction, but sufficient to guarantee invertibility. Squared Mahalanobis
-distances range from $723.13$ to $803.64$ (mean $778.10$, std $11.57$),
-\emph{all} far below the $\chi^2_{2000}$ $97.5\%$ threshold of $2125.84$:
+distances range from $723.10$ to $803.66$ (mean $778.10$, std $11.57$),
+\emph{all} below the $\chi^2_{800}$ $97.5\%$ threshold of $880.28$ (the
+degrees of freedom are the rank of the centered sample covariance,
+$n-1=800$, not the feature count $p=2{,}000$, since $D^2$ is confined by
+rank to an $800$-dimensional subspace):
 \textbf{zero of 801 samples are flagged as outliers.} This is a genuine
 empirical finding, not a null result to be explained away: it is discussed
 critically in Section~\ref{sec:discussion}. The ten most extreme samples by
-raw distance (Table~\ref{tab:mahalanobis-top10}) skew toward BRCA (5 of 10,
-vs.\ its $37.45\%$ class share) and LUAD (3 of 10, vs.\ $17.6\%$), with no
-PRAD or COAD samples appearing -- with only 10 samples this is not a
-statistically robust pattern, but is noted descriptively.
+raw distance (Table~\ref{tab:mahalanobis-top10}) skew toward BRCA (4 of 10,
+vs.\ its $37.45\%$ class share), LUAD (3 of 10, vs.\ $17.6\%$), and KIRC
+(3 of 10, vs.\ $18.2\%$), with no PRAD or COAD samples appearing -- with
+only 10 samples this is not a statistically robust pattern, but is noted
+descriptively.
 
 \section{Discussion}
 \label{sec:discussion}
@@ -506,25 +516,34 @@ estimators agree with each other more than either agrees with global
 linear variance thresholds.
 
 The zero Mahalanobis outliers deserve a direct methodological explanation
-rather than being read as ``the data has no outliers.'' The Ledoit-Wolf
-target shrinks the covariance toward $\mu I$ with $\mu = \mathrm{tr}(S)/p$
--- effectively an isotropic estimate with a single, averaged
-variance per gene. Because the true correlation-matrix spectrum is
-extremely heavy-tailed (Table~\ref{tab:spectral-outliers}: eigenvalues from
-near-zero to $318.3$), this isotropic blending inflates the estimated
-variance along the many near-zero directions relative to their true (near-zero)
-variance far more than it deflates the variance along the few
-large-eigenvalue directions, so $\hat\Sigma_{\text{LW}}^{-1}$
-systematically under-weights genuinely informative deviations. This is
-visible directly in the data: the mean observed $D^2$ ($778.1$) is only
-$38.9\%$ of its nominal expectation under the $\chi^2_{2000}$ null ($2{,}000$),
-showing the shrinkage-regularized distances are compressed well below what
-the classical chi-squared calibration assumes, not that the underlying
-data lacks structure. Mahalanobis distance under heavy shrinkage is
-therefore better used here as a \emph{relative ranking} tool
+rather than being read as ``the data has no outliers.'' Part of the
+explanation is structural rather than biological. Writing
+$\ell_1, \dots, \ell_{800}$ for the nonzero eigenvalues of the sample
+covariance $S$ and noting $\mu = \mathrm{tr}(S)/p = 1$ because the columns
+are standardized, the mean squared Mahalanobis distance satisfies
+\begin{equation}
+\frac{1}{n} \sum_{i=1}^n D^2(x_i) = \sum_{j=1}^{n-1} \frac{\ell_j}{(1-\alpha)\ell_j + \alpha \mu} \;\leq\; \frac{n-1}{1-\alpha},
+\label{eq:mahal-ceiling}
+\end{equation}
+so with $\hat\alpha = 0.0239$ the mean is bounded above by $819.6$
+\emph{no matter what the data are}, and tends to exactly $n-1=800$ as
+$\alpha \to 0$. The observed mean of $778.1$ (std $11.57$, a relative
+spread of only $1.5\%$) sits exactly where Eq.~\ref{eq:mahal-ceiling} says
+it must: this tightness is a property of the $p>n$ geometry, not of these
+tumors. Under the corrected $\chi^2_{800}$ threshold of $880.28$ the most
+extreme sample (sample\_560, $803.66$) reaches $91.3\%$ of the cutoff, so
+the test now has room to fire and still does not. Separately, because the
+Ledoit-Wolf target shrinks the covariance toward an isotropic $\mu I$ while
+the true correlation-matrix spectrum is extremely heavy-tailed
+(Table~\ref{tab:spectral-outliers}: eigenvalues from near-zero to $318.3$),
+the blending inflates the estimated variance along the many near-zero
+directions more than it deflates it along the few dominant ones, so
+$\hat\Sigma_{\text{LW}}^{-1}$ down-weights genuinely informative deviations
+relative to an unregularized metric. Mahalanobis distance under heavy
+shrinkage is therefore better used here as a \emph{relative ranking} tool
 (Table~\ref{tab:mahalanobis-top10}) than as a formally calibrated
-significance test -- a limitation of applying an asymptotic Gaussian
-threshold to a deliberately regularized, non-asymptotic $d \gg n$ estimator.
+significance test -- a limitation of applying an asymptotic threshold to a
+deliberately regularized, non-asymptotic $d \gg n$ estimator.
 
 \section{Limitations}
 \label{sec:limitations}

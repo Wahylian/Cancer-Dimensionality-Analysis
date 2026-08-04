@@ -204,9 +204,9 @@ Levina--Bickel mean at $k=10$.}
 \toprule
 $\sigma$ & $D_2$ & Kaiser elbow & PCA@90 & kNN-MLE ($k=10$) \\
 \midrule
-0.100 & 17.83 & 356 & 686 & 531.70 \\
-0.010 & 1.34  & 5   & 457 & 25.57 \\
-0.001 & 4.63  & 5   & 5   & 5.28 \\
+0.100 & 18.06 & 357 & 686 & 532.72 \\
+0.010 & 1.22  & 5   & 503 & 31.75 \\
+0.001 & 4.29  & 5   & 5   & 5.42 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -226,9 +226,9 @@ $k$.}
 \toprule
 Dataset & $D_2$ & $R^2$ & PCA@90 & PCA@95 & PCA@99 & kNN$_{k=5}$ & kNN$_{k=10}$ & kNN$_{k=20}$ \\
 \midrule
-Real (RNA-Seq)   & 7.73  & 1.000 & 392 & 548 & 732 & 33.16  & 29.55  & 25.37 \\
-Gaussian Noise   & 49.02 & 0.998 & 688 & 742 & 788 & 656.95 & 618.75 & 582.36 \\
-Linear Manifold  & 4.63  & 1.000 & 5   & 5   & 5   & 5.44   & 5.28   & 5.09 \\
+Real (RNA-Seq)   & 7.73   & 1.000 & 392 & 548 & 732 & 33.16  & 29.55  & 25.37 \\
+Gaussian Noise   & 419.52 & 1.000 & 688 & 742 & 788 & 626.09 & 621.67 & 583.31 \\
+Linear Manifold  & 4.29   & 1.000 & 5   & 5   & 5   & 5.69   & 5.42   & 5.20 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -241,9 +241,9 @@ Linear Manifold  & 4.63  & 1.000 & 5   & 5   & 5   & 5.44   & 5.28   & 5.09 \\
 \toprule
 Dataset & Kaiser elbow & Curvature elbow \\
 \midrule
-Real (RNA-Seq)   & 100 & 2 \\
-Gaussian Noise   & 386 & 799 \\
-Linear Manifold  & 5   & 4 \\
+Real (RNA-Seq)   & 100 & 3 \\
+Gaussian Noise   & 386 & 54 \\
+Linear Manifold  & 5   & 5 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -253,11 +253,17 @@ variance decays sharply within the first $\sim 10$ components and then
 follows a long, shallow tail out to $801$ components, consistent with a
 data cloud dominated by a compact set of directions with a heavy-tailed
 residual spread across many minor directions of biological and technical
-variation. The curvature elbow at component $2$ reflects only the single
-steepest initial drop (between PC1 and PC2) and clearly under-counts;
-the Kaiser elbow at $100$ is the more defensible summary of "components
-carrying above-average signal," though still well above $D_2$ and the
-$k$-NN MLE estimates, for reasons discussed in Section~\ref{sec:discussion}.
+variation. The curvature criterion recovers the ground-truth dimension exactly on
+the linear-manifold baseline (Table~\ref{tab:elbow}), which validates the
+criterion itself, but on the real data it returns $3$. That is not a
+low-dimensionality claim in its own right: the criterion needs a clean
+break in the spectrum to locate, and the real scree curve decays
+smoothly rather than showing one, so its maximum second difference falls
+near the front of the curve without marking anything structurally real.
+The Kaiser elbow at $100$ is the more defensible summary of "components
+carrying above-average signal" on this data, though still well above
+$D_2$ and the $k$-NN MLE estimates, for reasons discussed in
+Section~\ref{sec:discussion}.
 
 \begin{figure}[H]
 \centering
