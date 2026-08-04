@@ -71,6 +71,7 @@ Cancer-Dimensionality-Analysis/
 ├── figures/                 # all generated plots and summary tables
 ├── reports/                 # per-phase LaTeX writeups (phase_1.tex-phase_4.tex)
 ├── data/                    # raw/ and processed/ (gitignored)
+├── Cancer-Dimensionality-Analysis-Reprort.pdf     # project report
 ├── ai_usage_log.md          # AI-tool usage documentation
 ├── download_data.py         # Kaggle CLI download script
 ├── run_pipeline.py          # top-level orchestration script
