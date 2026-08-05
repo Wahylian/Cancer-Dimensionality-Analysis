@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from src import (
     anomaly_detection,
@@ -212,19 +213,35 @@ def main():
     )
     print("Phase 3 t-SNE/UMAP comparison figures saved.")
 
-    # --- Phase 3: Johnson-Lindenstrauss random projection ---
-    jl_target_dim = random_projection.jl_target_dimension(X_scaled_full.shape[0], config.JL_EPSILON)
-    X_proj = random_projection.random_gaussian_projection(X_scaled_full, jl_target_dim, config.RANDOM_SEED)
-    jl_eval = random_projection.evaluate_distance_preservation(X_scaled_full, X_proj)
-    viz.jl_distortion_plot(
-        jl_eval["original_distances"], jl_eval["projected_distances"], jl_eval["distortion_ratios"],
-        config.JL_EPSILON, str(Path(config.FIGURES_DIR) / "jl_distortion.png"),
+    # --- Phase 3: Johnson-Lindenstrauss dimension sweep ---
+    # A single (epsilon, k) point is uninformative once k approaches or exceeds
+    # n-1=800 (the exact-distortion rank bound for 801 centred points); JL at
+    # eps=0.2 gives k=1543 > 800, so that guarantee was never binding. Sweeping
+    # k separates oblivious metric distortion from data-dependent structure
+    # preservation instead.
+    print(f"\nPhase 3 JL sweep: k_values={config.JL_SWEEP_K_VALUES}, seeds={config.JL_SWEEP_SEEDS}")
+    jl_sweep = random_projection.jl_dimension_sweep(
+        X_scaled_full, y_values, config.JL_SWEEP_K_VALUES, config.JL_SWEEP_SEEDS, config.JL_SWEEP_KNN
     )
-    print(
-        f"Phase 3 JL projection: target_dim={jl_target_dim} (from d={X_scaled_full.shape[1]}), "
-        f"mean distortion={jl_eval['mean_distortion']:.4f}, max |deviation|={jl_eval['max_abs_deviation']:.4f}, "
-        f"fraction within eps={config.JL_EPSILON}: {jl_eval['frac_within_epsilon']:.4f}"
+    viz.jl_sweep_plot(
+        jl_sweep, config.JL_SWEEP_K_VALUES, str(Path(config.FIGURES_DIR) / "jl_sweep.png"),
+        k_markers={800: "k=800 (rank bound)", 1543: "k=1543 (JL eps=0.2)"},
     )
+    jl_sweep_table = pd.DataFrame([
+        {
+            "k": k,
+            "mean_rho": jl_sweep[k]["mean_rho"][0], "mean_rho_sd": jl_sweep[k]["mean_rho"][1],
+            "max_abs_dev": jl_sweep[k]["max_abs_dev"][0], "max_abs_dev_sd": jl_sweep[k]["max_abs_dev"][1],
+            "theoretical_max_dev": jl_sweep[k]["theoretical_max_dev"],
+            "knn10_overlap": jl_sweep[k]["overlap"][0], "knn10_overlap_sd": jl_sweep[k]["overlap"][1],
+            "lb_id": jl_sweep[k]["lb_id"][0], "lb_id_sd": jl_sweep[k]["lb_id"][1],
+            "silhouette": jl_sweep[k]["silhouette"][0], "silhouette_sd": jl_sweep[k]["silhouette"][1],
+        }
+        for k in config.JL_SWEEP_K_VALUES
+    ])
+    jl_sweep_table.to_csv(Path(config.FIGURES_DIR) / "jl_sweep_table.csv", index=False)
+    print("Phase 3 JL sweep results:")
+    print(jl_sweep_table.to_string(index=False))
 
     # --- Phase 3: spectral analysis (top-k genes) vs. Marchenko-Pastur ---
     spectral_eigs = spectral_analysis.empirical_spectral_distribution(X_scaled_topk)

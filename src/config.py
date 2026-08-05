@@ -57,6 +57,15 @@ UMAP_N_NEIGHBORS_VALUES = [15, 50]
 # illustrative ~13x reduction.
 JL_EPSILON = 0.2
 
+# JL dimension sweep: replaces the single-point (epsilon, k) experiment above,
+# which is uninformative here since k=1543 > n-1=800 (the exact-distortion
+# rank bound for 801 centred points) makes the JL guarantee non-binding.
+# k=800 is that rank bound; k=1543 is JL_EPSILON's target dimension; the rest
+# span two orders of magnitude around both landmarks.
+JL_SWEEP_K_VALUES = [20, 30, 50, 100, 200, 321, 500, 800, 1543, 3000]
+JL_SWEEP_SEEDS = list(range(10))
+JL_SWEEP_KNN = 10
+
 # Spectral analysis (Marchenko-Pastur): reuse the top-k variable gene subset
 # for tractability (same subset already cached in data/processed/phase1_topk.npz).
 SPECTRAL_N_TOP_GENES = N_TOP_VARIABLE_GENES

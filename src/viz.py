@@ -221,6 +221,73 @@ def jl_distortion_plot(
     plt.close(fig)
 
 
+def jl_sweep_plot(per_k: dict, k_values: list, save_path: str, k_markers: dict = None) -> None:
+    """Two-panel JL dimension-sweep figure sharing a log-scaled x-axis.
+
+    Left: metric distortion (max and 99.9th-percentile |rho-1|, mean +/- 1 sd
+    shaded band across seeds) with the theoretical union-bound overlay. Right:
+    structure-preservation metrics (10-NN overlap and silhouette on the left
+    axis, Levina-Bickel ID estimate on a twin right axis, since it has a
+    different scale), same band convention. `k_markers` draws labeled vertical
+    reference lines (e.g. the rank bound and the JL target dimension) on both
+    panels.
+    """
+    ks = np.array(k_values)
+
+    def band(stat):
+        mean = np.array([per_k[k][stat][0] for k in k_values])
+        std = np.array([per_k[k][stat][1] for k in k_values])
+        return mean, std
+
+    theory = np.array([per_k[k]["theoretical_max_dev"] for k in k_values])
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    max_mean, max_std = band("max_abs_dev")
+    p999_mean, p999_std = band("p999_abs_dev")
+    axes[0].plot(ks, max_mean, "o-", color="indianred", label="max |rho - 1| (empirical)")
+    axes[0].fill_between(ks, max_mean - max_std, max_mean + max_std, color="indianred", alpha=0.2)
+    axes[0].plot(ks, p999_mean, "s-", color="steelblue", label="99.9th pct |rho - 1|")
+    axes[0].fill_between(ks, p999_mean - p999_std, p999_mean + p999_std, color="steelblue", alpha=0.2)
+    axes[0].plot(ks, theory, "--", color="black", linewidth=1.5, label=r"theory $\sqrt{2\ln M}/\sqrt{2k}$")
+    for k_mark, label in (k_markers or {}).items():
+        axes[0].axvline(k_mark, color="gray", linestyle=":", linewidth=1, label=label)
+    axes[0].set_xscale("log")
+    axes[0].set_xlabel("Target dimension k (log scale)")
+    axes[0].set_ylabel("Distortion |rho - 1|")
+    axes[0].set_title("Metric distortion (data-independent)")
+    axes[0].legend(fontsize=7)
+
+    overlap_mean, overlap_std = band("overlap")
+    sil_mean, sil_std = band("silhouette")
+    lb_mean, lb_std = band("lb_id")
+
+    axes[1].plot(ks, overlap_mean, "o-", color="seagreen", label="10-NN overlap")
+    axes[1].fill_between(ks, overlap_mean - overlap_std, overlap_mean + overlap_std, color="seagreen", alpha=0.2)
+    axes[1].plot(ks, sil_mean, "^-", color="darkorange", label="Silhouette score")
+    axes[1].fill_between(ks, sil_mean - sil_std, sil_mean + sil_std, color="darkorange", alpha=0.2)
+    axes[1].set_xscale("log")
+    axes[1].set_xlabel("Target dimension k (log scale)")
+    axes[1].set_ylabel("10-NN overlap / silhouette")
+    axes[1].set_title("Structure preservation (data-dependent)")
+
+    ax2 = axes[1].twinx()
+    ax2.plot(ks, lb_mean, "d-", color="purple", label="Levina-Bickel ID (k=10)")
+    ax2.fill_between(ks, lb_mean - lb_std, lb_mean + lb_std, color="purple", alpha=0.15)
+    ax2.set_ylabel("Levina-Bickel ID estimate", color="purple")
+
+    for k_mark in (k_markers or {}):
+        axes[1].axvline(k_mark, color="gray", linestyle=":", linewidth=1)
+
+    lines_left, labels_left = axes[1].get_legend_handles_labels()
+    lines_right, labels_right = ax2.get_legend_handles_labels()
+    axes[1].legend(lines_left + lines_right, labels_left + labels_right, fontsize=7, loc="center right")
+
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+
+
 def distance_concentration_plot(results: dict, theoretical_bounds: dict, save_path: str) -> None:
     """Concentration ratio (max-min)/min vs. feature count, log-x, with the theoretical bound curve."""
     feature_counts = sorted(results.keys())
